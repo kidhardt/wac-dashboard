@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, X, Download } from 'lucide-react';
 import { Institution } from '../types';
 import { getFieldLabel, formatValue } from '../utils/filters';
 
@@ -21,7 +21,6 @@ const COMPARISON_FIELDS: (keyof Institution)[] = [
   'foundedYear',
   'hasWACProgram',
   'wacProgramEstablished',
-  'wacProgramType',
   'wacDirectorPosition',
   'wacFacultyFTE',
   'wacBudget',
@@ -39,8 +38,56 @@ const COMPARISON_FIELDS: (keyof Institution)[] = [
 
 const ComparisonView = ({ institutions, selectedIds, onSelectionChange }: ComparisonViewProps) => {
   const [showAllFields, setShowAllFields] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const selectedInstitutions = institutions.filter(inst => selectedIds.includes(inst.id));
+
+  // Export functions
+  const exportToCSV = () => {
+    const headers = [
+      'Field',
+      ...selectedInstitutions.map(inst => inst.shortName),
+    ];
+
+    const csvData = COMPARISON_FIELDS.map(field => [
+      getFieldLabel(field),
+      ...selectedInstitutions.map(inst => {
+        const value = inst[field];
+        if (typeof value === 'boolean') {
+          return value ? 'Yes' : 'No';
+        }
+        return formatValue(value, field);
+      }),
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.map(cell => `"${cell}"`).join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `wac-comparison-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportToJSON = () => {
+    const jsonData = JSON.stringify(selectedInstitutions, null, 2);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `wac-comparison-${new Date().toISOString().split('T')[0]}.json`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const handleToggleInstitution = (id: string) => {
     if (selectedIds.includes(id)) {
@@ -56,13 +103,74 @@ const ComparisonView = ({ institutions, selectedIds, onSelectionChange }: Compar
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-xl font-semibold text-slate-900 mb-2">
-          Compare Institutions
-        </h3>
-        <p className="text-slate-600">
-          Select up to 4 institutions to compare side-by-side
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h3 className="text-xl font-semibold text-slate-900 mb-2">
+            Compare Institutions
+          </h3>
+          <p className="text-slate-600">
+            Select up to 4 institutions to compare side-by-side
+          </p>
+        </div>
+
+        {/* Export Button - Only show when 2 or more institutions are selected */}
+        {selectedInstitutions.length >= 2 && (
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors shadow-sm"
+              aria-expanded={showExportMenu}
+              aria-haspopup="true"
+            >
+              <Download className="w-4 h-4" />
+              Export Comparison
+            </button>
+
+            {showExportMenu && (
+              <>
+                {/* Backdrop to close menu */}
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowExportMenu(false)}
+                  aria-hidden="true"
+                />
+
+                {/* Dropdown Menu */}
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-slate-200 z-20">
+                  <div className="py-1" role="menu">
+                    <button
+                      onClick={() => {
+                        exportToCSV();
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 flex items-center gap-2"
+                      role="menuitem"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export as CSV
+                    </button>
+                    <button
+                      onClick={() => {
+                        exportToJSON();
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 flex items-center gap-2"
+                      role="menuitem"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export as JSON
+                    </button>
+                  </div>
+                  <div className="border-t border-slate-200 px-4 py-2 bg-slate-50">
+                    <p className="text-xs text-slate-500">
+                      {selectedInstitutions.length} institution{selectedInstitutions.length !== 1 ? 's' : ''} will be exported
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Institution Selection */}

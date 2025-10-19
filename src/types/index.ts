@@ -23,10 +23,9 @@ export interface Institution {
   graduateEnrollment: number;
   foundedYear: number;
 
-  // WAC Program Details (9 variables)
+  // WAC Program Details (8 variables)
   hasWACProgram: boolean;
   wacProgramEstablished: number | null;
-  wacProgramType: 'centralized' | 'distributed' | 'hybrid' | 'none';
   wacDirectorPosition: boolean;
   wacFacultyFTE: number;
   wacBudget: number | null; // Annual budget in USD
@@ -67,7 +66,6 @@ export interface FilterState {
 
   // WAC Program filters
   hasWACProgram: boolean | null;
-  wacProgramTypes: ('centralized' | 'distributed' | 'hybrid' | 'none')[];
   establishedYearRange: {
     min: number;
     max: number;
@@ -97,7 +95,7 @@ export interface InstitutionStatistics {
   totalWritingIntensiveCourses: number;
   institutionsByType: Record<string, number>;
   institutionsByState: Record<string, number>;
-  wacProgramsByType: Record<string, number>;
+  carnegieClassificationStats: Record<string, number>;
 }
 
 /**
@@ -124,7 +122,7 @@ export type SortDirection = 'asc' | 'desc';
 /**
  * View mode for the dashboard
  */
-export type ViewMode = 'map' | 'table' | 'charts' | 'comparison';
+export type ViewMode = 'map' | 'table' | 'charts' | 'comparison' | 'chat';
 
 /**
  * Comparison mode for side-by-side institution analysis

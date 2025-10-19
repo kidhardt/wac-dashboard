@@ -24,7 +24,6 @@ export const institutions: Institution[] = [
     foundedYear: 1868,
     hasWACProgram: true,
     wacProgramEstablished: 1982,
-    wacProgramType: 'distributed',
     wacDirectorPosition: true,
     wacFacultyFTE: 3.5,
     wacBudget: 850000,
@@ -58,7 +57,6 @@ export const institutions: Institution[] = [
     foundedYear: 1838,
     hasWACProgram: true,
     wacProgramEstablished: 1987,
-    wacProgramType: 'centralized',
     wacDirectorPosition: true,
     wacFacultyFTE: 4.0,
     wacBudget: 1200000,
@@ -92,7 +90,6 @@ export const institutions: Institution[] = [
     foundedYear: 1876,
     hasWACProgram: true,
     wacProgramEstablished: 1991,
-    wacProgramType: 'hybrid',
     wacDirectorPosition: true,
     wacFacultyFTE: 2.5,
     wacBudget: 650000,
@@ -126,7 +123,6 @@ export const institutions: Institution[] = [
     foundedYear: 1861,
     hasWACProgram: true,
     wacProgramEstablished: 1979,
-    wacProgramType: 'centralized',
     wacDirectorPosition: true,
     wacFacultyFTE: 5.0,
     wacBudget: 1500000,
@@ -160,7 +156,6 @@ export const institutions: Institution[] = [
     foundedYear: 1817,
     hasWACProgram: true,
     wacProgramEstablished: 1985,
-    wacProgramType: 'distributed',
     wacDirectorPosition: true,
     wacFacultyFTE: 3.0,
     wacBudget: 920000,
@@ -194,7 +189,6 @@ export const institutions: Institution[] = [
     foundedYear: 1836,
     hasWACProgram: true,
     wacProgramEstablished: 1993,
-    wacProgramType: 'hybrid',
     wacDirectorPosition: true,
     wacFacultyFTE: 2.8,
     wacBudget: 780000,
@@ -228,7 +222,6 @@ export const institutions: Institution[] = [
     foundedYear: 1946,
     hasWACProgram: true,
     wacProgramEstablished: 1996,
-    wacProgramType: 'distributed',
     wacDirectorPosition: true,
     wacFacultyFTE: 2.0,
     wacBudget: 420000,
@@ -262,7 +255,6 @@ export const institutions: Institution[] = [
     foundedYear: 1826,
     hasWACProgram: true,
     wacProgramEstablished: 1988,
-    wacProgramType: 'centralized',
     wacDirectorPosition: true,
     wacFacultyFTE: 1.5,
     wacBudget: 280000,
@@ -296,7 +288,6 @@ export const institutions: Institution[] = [
     foundedYear: 1885,
     hasWACProgram: true,
     wacProgramEstablished: 1994,
-    wacProgramType: 'hybrid',
     wacDirectorPosition: true,
     wacFacultyFTE: 4.5,
     wacBudget: 1100000,
@@ -330,7 +321,6 @@ export const institutions: Institution[] = [
     foundedYear: 1866,
     hasWACProgram: true,
     wacProgramEstablished: 1986,
-    wacProgramType: 'distributed',
     wacDirectorPosition: true,
     wacFacultyFTE: 1.2,
     wacBudget: 240000,
@@ -364,7 +354,6 @@ export const institutions: Institution[] = [
     foundedYear: 1957,
     hasWACProgram: true,
     wacProgramEstablished: 1998,
-    wacProgramType: 'hybrid',
     wacDirectorPosition: true,
     wacFacultyFTE: 2.3,
     wacBudget: 550000,
@@ -398,7 +387,6 @@ export const institutions: Institution[] = [
     foundedYear: 1959,
     hasWACProgram: true,
     wacProgramEstablished: 2002,
-    wacProgramType: 'centralized',
     wacDirectorPosition: true,
     wacFacultyFTE: 1.8,
     wacBudget: 320000,
@@ -431,10 +419,44 @@ export const getInstitutionTypes = (): ('public' | 'private' | 'community')[] =>
 };
 
 /**
- * Helper function to get unique Carnegie classifications
+ * Helper function to simplify Carnegie classification labels
+ */
+export const simplifyCarnegieClassification = (classification: string): string => {
+  if (classification.includes('R1')) return 'R1: Doctoral Universities';
+  if (classification.includes('R2')) return 'R2: Doctoral Universities';
+  if (classification.includes('Baccalaureate')) return 'Baccalaureate Colleges';
+  if (classification.includes('Associate')) return "Associate's Colleges";
+  return classification;
+};
+
+/**
+ * Helper function to get unique Carnegie classifications in preferred order
  */
 export const getCarnegieClassifications = (): string[] => {
-  return Array.from(new Set(institutions.map(inst => inst.carnegieClassification))).sort();
+  const uniqueClassifications = Array.from(new Set(institutions.map(inst => inst.carnegieClassification)));
+
+  // Define preferred order
+  const order = [
+    'R1: Doctoral Universities – Very High Research Activity',
+    'R2: Doctoral Universities – High Research Activity',
+    'Baccalaureate Colleges: Arts & Sciences Focus',
+    "Associate's Colleges: High Transfer-High Traditional"
+  ];
+
+  // Sort based on the order array
+  return uniqueClassifications.sort((a, b) => {
+    const indexA = order.indexOf(a);
+    const indexB = order.indexOf(b);
+
+    // If both are in the order array, sort by their position
+    if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+    // If only A is in the order array, it comes first
+    if (indexA !== -1) return -1;
+    // If only B is in the order array, it comes first
+    if (indexB !== -1) return 1;
+    // Otherwise, alphabetically sort
+    return a.localeCompare(b);
+  });
 };
 
 /**
@@ -477,13 +499,6 @@ export const getEstablishedYearRange = (): { min: number; max: number } => {
 };
 
 /**
- * Helper function to get unique WAC program types
- */
-export const getWACProgramTypes = (): ('centralized' | 'distributed' | 'hybrid' | 'none')[] => {
-  return Array.from(new Set(institutions.map(inst => inst.wacProgramType)));
-};
-
-/**
  * Calculate statistics across all institutions
  */
 export const calculateStatistics = (institutionList: Institution[] = institutions) => {
@@ -522,8 +537,8 @@ export const calculateStatistics = (institutionList: Institution[] = institution
       acc[i.state] = (acc[i.state] || 0) + 1;
       return acc;
     }, {} as Record<string, number>),
-    wacProgramsByType: institutionList.reduce((acc, i) => {
-      acc[i.wacProgramType] = (acc[i.wacProgramType] || 0) + 1;
+    carnegieClassificationStats: institutionList.reduce((acc, i) => {
+      acc[i.carnegieClassification] = (acc[i.carnegieClassification] || 0) + 1;
       return acc;
     }, {} as Record<string, number>),
   };

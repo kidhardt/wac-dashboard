@@ -60,13 +60,6 @@ export const filterInstitutions = (
       }
     }
 
-    // WAC program type filter
-    if (filters.wacProgramTypes.length > 0) {
-      if (!filters.wacProgramTypes.includes(institution.wacProgramType)) {
-        return false;
-      }
-    }
-
     // Established year range filter
     if (institution.wacProgramEstablished !== null) {
       const { min: minYear, max: maxYear } = filters.establishedYearRange;
@@ -173,10 +166,9 @@ export const searchInstitutions = (
       institution.state,
       institution.institutionType,
       institution.carnegieClassification,
-      institution.wacProgramType,
     ];
 
-    return searchableFields.some(field => 
+    return searchableFields.some(field =>
       field.toLowerCase().includes(term)
     );
   });
@@ -204,7 +196,6 @@ export const createDefaultFilterState = (
       max: maxEnrollment,
     },
     hasWACProgram: null,
-    wacProgramTypes: [],
     establishedYearRange: {
       min: minYear,
       max: maxYear,
@@ -243,7 +234,6 @@ export const exportToCSV = (institutions: Institution[]): string => {
     'foundedYear',
     'hasWACProgram',
     'wacProgramEstablished',
-    'wacProgramType',
     'wacDirectorPosition',
     'wacFacultyFTE',
     'wacBudget',
@@ -375,7 +365,6 @@ export const getFieldLabel = (field: keyof Institution): string => {
     foundedYear: 'Founded Year',
     hasWACProgram: 'Has WAC Program',
     wacProgramEstablished: 'WAC Program Established',
-    wacProgramType: 'WAC Program Type',
     wacDirectorPosition: 'Has WAC Director',
     wacFacultyFTE: 'WAC Faculty FTE',
     wacBudget: 'WAC Annual Budget',

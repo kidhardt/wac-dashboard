@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Map, BarChart3, Table2, GitCompare } from 'lucide-react';
+import { Map, BarChart3, Table2, GitCompare, MessageSquare } from 'lucide-react';
 import Header from './components/Header';
 import MapView from './components/MapView';
 import ChartsView from './components/ChartsView';
 import ComparisonView from './components/ComparisonView';
-import { institutions } from './data/institutions';
+import ChatTab from './components/ChatTab';
+import { institutions, getCarnegieClassifications, simplifyCarnegieClassification } from './data/institutions';
 import { filterInstitutions, createDefaultFilterState, sortInstitutions } from './utils/filters';
 import { ViewMode, FilterState, SortConfig, Institution } from './types';
 
@@ -39,15 +40,6 @@ function App() {
       field,
       direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc',
     }));
-  };
-
-  // Handle institution selection
-  const toggleInstitutionSelection = (id: string) => {
-    setSelectedInstitutions(prev =>
-      prev.includes(id)
-        ? prev.filter(i => i !== id)
-        : [...prev, id]
-    );
   };
 
   // Reset filters
@@ -124,6 +116,19 @@ function App() {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => handleViewModeChange('chat')}
+              className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors border-b-2 ${
+                viewMode === 'chat'
+                  ? 'border-primary-900 text-primary-900'
+                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
+              }`}
+              role="tab"
+              aria-selected={viewMode === 'chat'}
+            >
+              <MessageSquare className="w-5 h-5" />
+              Chat
+            </button>
           </nav>
         </div>
       </div>
@@ -184,26 +189,26 @@ function App() {
                 </div>
               </div>
 
-              {/* WAC Program Type */}
+              {/* Carnegie Classification */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  WAC Program Type
+                  Carnegie Classification
                 </label>
-                <div className="space-y-2">
-                  {['centralized', 'distributed', 'hybrid'].map(type => (
-                    <label key={type} className="flex items-center">
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {getCarnegieClassifications().map(classification => (
+                    <label key={classification} className="flex items-center">
                       <input
                         type="checkbox"
-                        checked={filters.wacProgramTypes.includes(type as any)}
+                        checked={filters.carnegieClassifications.includes(classification)}
                         onChange={(e) => {
-                          const types = e.target.checked
-                            ? [...filters.wacProgramTypes, type as any]
-                            : filters.wacProgramTypes.filter(t => t !== type);
-                          handleFilterChange({ wacProgramTypes: types });
+                          const classifications = e.target.checked
+                            ? [...filters.carnegieClassifications, classification]
+                            : filters.carnegieClassifications.filter(c => c !== classification);
+                          handleFilterChange({ carnegieClassifications: classifications });
                         }}
                         className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                       />
-                      <span className="ml-2 text-sm text-slate-700 capitalize">{type}</span>
+                      <span className="ml-2 text-sm text-slate-700">{simplifyCarnegieClassification(classification)}</span>
                     </label>
                   ))}
                 </div>
@@ -259,8 +264,9 @@ function App() {
                               onClick={() => handleSortChange('totalEnrollment')}>
                             Enrollment
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider">
-                            WAC Program
+                          <th className="px-4 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-100"
+                              onClick={() => handleSortChange('carnegieClassification')}>
+                            Carnegie Classification
                           </th>
                         </tr>
                       </thead>
@@ -279,15 +285,8 @@ function App() {
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-700">
                               {inst.totalEnrollment.toLocaleString()}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${
-                                inst.wacProgramType === 'centralized' ? 'bg-blue-100 text-blue-800' :
-                                inst.wacProgramType === 'distributed' ? 'bg-green-100 text-green-800' :
-                                inst.wacProgramType === 'hybrid' ? 'bg-purple-100 text-purple-800' :
-                                'bg-slate-100 text-slate-800'
-                              }`}>
-                                {inst.wacProgramType}
-                              </span>
+                            <td className="px-4 py-3 text-sm text-slate-700">
+                              {inst.carnegieClassification}
                             </td>
                           </tr>
                         ))}
@@ -308,6 +307,10 @@ function App() {
                   onSelectionChange={setSelectedInstitutions}
                 />
               )}
+
+              {viewMode === 'chat' && (
+                <ChatTab />
+              )}
             </div>
           </div>
         </div>
@@ -318,9 +321,6 @@ function App() {
         <div className="container mx-auto px-4 py-6">
           <div className="text-center text-sm text-slate-600">
             <p>WAC Dashboard &copy; 2025 | Writing Across the Curriculum Research</p>
-            <p className="mt-1">
-              Exploring {institutions.length} institutions across the United States
-            </p>
           </div>
         </div>
       </footer>

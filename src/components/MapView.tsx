@@ -64,7 +64,7 @@ const MapView = ({ institutions, onInstitutionClick }: MapViewProps) => {
                     <span className="font-medium">Enrollment:</span> {institution.totalEnrollment.toLocaleString()}
                   </p>
                   <p className="text-slate-600">
-                    <span className="font-medium">WAC Program:</span> {institution.wacProgramType}
+                    <span className="font-medium">Carnegie:</span> {institution.carnegieClassification}
                   </p>
                   {institution.wacBudget && (
                     <p className="text-slate-600">
