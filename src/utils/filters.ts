@@ -207,6 +207,26 @@ export const createDefaultFilterState = (
       min: minBudget,
       max: maxBudget,
     },
+    // Institution Classification filters
+    instSizes: [],
+    institutionTypeFundings: [],
+    institutionTypeMissions: [],
+    termSystems: [],
+    writingProgramStructures: [],
+    writingProgramAdmins: [],
+    // Course Offerings filters
+    hasDevRemWriting: null,
+    hasFycRequired: null,
+    hasStretchFyc: null,
+    hasUpperDivWriting: null,
+    hasEslUndergradWriting: null,
+    hasEslGradWriting: null,
+    // Minority-Serving Institution filters
+    showOnlyHbcu: false,
+    showOnlyHsi: false,
+    showOnlyAanapisi: false,
+    showOnlyTribal: false,
+    showOnlyMsi: false,
   };
 };
 
