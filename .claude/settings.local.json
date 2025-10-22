@@ -23,7 +23,8 @@
       "Bash(PYTHONIOENCODING=utf-8 python:*)",
       "Bash(npm run dev:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(cp:*)"
     ],
     "deny": [],
     "ask": []

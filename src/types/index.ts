@@ -23,6 +23,13 @@ export interface Institution {
   graduateEnrollment: number;
   foundedYear: number;
 
+  // Institution Classification
+  instSize: "extraSmall" | "small" | "medium" | "large" | "extraLarge";
+  institutionTypeFunding: "publicUniversity" | "privateUniversity" | "communityCollege" | "militaryAcademy" | "religiousAffiliated";
+  institutionTypeMission: "liberalArts" | "research" | "teaching" | "professionalTraining" | "onlineEducation" | "specialized" | "graduateEducation" | "militaryTraining";
+  institutionTypeReligious: "catholicConsortium" | "seminariesBibleCollege" | "denominationAffiliated" | "nonReligious" | null;
+  institutionTypeSpecialization: "artDesignSchool" | "musicPerformingArtsSchool" | "otherProfessionalSchool" | "technicalTradeSchool" | "generalist";
+
   // WAC Program Details (8 variables)
   hasWACProgram: boolean;
   wacProgramEstablished: number | null;
@@ -32,6 +39,20 @@ export interface Institution {
   writingIntensiveCourses: number;
   requiredWICourses: number;
   wacWebsiteUrl: string;
+
+  // Program Structure
+  termSystem: "semester" | "quarter" | null;
+  writingProgramStructure: "independentWritingProgram" | "embeddedInLiteratureDept" | "embeddedInOtherDept" | null;
+  writingProgramAdmin: "oneFormalWpa" | "multipleDirectors" | "noFormalAdministrator" | null;
+  instructorTraining: "teachingTrainingPracticum" | "l2TeacherTrainingPracticum" | "teachingTrainingPracticumAndL2" | "noFormalTraining" | null;
+
+  // Placement and Assessment
+  dspUsage: "exclusivelyDsp" | "utilizesDspNotExclusively" | "dspComponentAlongsideOther" | "otherMeasuresInformedByDsp" | "notUsingButConsidering" | "notUsingNoPlans" | null;
+
+  // Class Size Caps
+  fycCap: "fycc12-15" | "fycc16-20" | "fycc21-25" | "fycc26-30" | "fycc31+" | null;
+  upperDivCap: "udc12-15" | "udc16-20" | "udc21-25" | "udc26-30" | "udc31+" | null;
+  basicCap: "bcc12-15" | "bcc16-20" | "bcc21-25" | "bcc26-30" | "bcc31+" | null;
 
   // Writing Support Services (5 variables)
   hasWritingCenter: boolean;
@@ -44,6 +65,40 @@ export interface Institution {
   facultyWorkshopsPerYear: number;
   writingFacultyDevelopmentProgram: boolean;
   crossDisciplinaryWritingInitiatives: boolean;
+
+  // Faculty Composition
+  ttFacultyPercentage: "tt0" | "tt1-5" | "tt5-10" | "tt10-20" | "tt20+" | null;
+  ftFacultyPercentage: "ft0" | "ft1-10" | "ft11-30" | "ft31-50" | "ft51-70" | "ft71-90" | "ft90+" | null;
+  partTimerPercentage: "0-10" | "10-20" | "20-40" | "40-60" | "60-70" | "70-80" | "80-90" | "90-100" | null;
+
+  // Course Offerings
+  devRemWriting: boolean | null;
+  fycRequired: boolean | null;
+  stretchFyc: boolean | null;
+  upperDivWriting: boolean | null;
+  writingIntensiveOffered: boolean | null;
+  gradWritingCourse: boolean | null;
+  eslUndergradWriting: boolean | null;
+  eslGradWriting: boolean | null;
+  otherEslClasses: boolean | null;
+
+  // WPA Credentials
+  wpaDoctoral: boolean | null;
+  wpaMasters: boolean | null;
+  wpaRhetComp: boolean | null;
+  wpaLinguisticsTesol: boolean | null;
+  wpaEducation: boolean | null;
+  wpaLiterature: boolean | null;
+  wpaPhilosophy: boolean | null;
+  wpaTESOLCertificate: boolean | null;
+  wpaCreativeWriting: boolean | null;
+
+  // Minority-Serving Institutions
+  instMinTypeHbcu: boolean;
+  instMinTypeHsi: boolean;
+  instMinTypeAanapisi: boolean;
+  instMinTypeTribal: boolean;
+  instMinTypeOtherMsi: boolean;
 }
 
 /**
@@ -81,6 +136,29 @@ export interface FilterState {
     min: number;
     max: number;
   };
+
+  // Institution Classification filters
+  instSizes: ("extraSmall" | "small" | "medium" | "large" | "extraLarge")[];
+  institutionTypeFundings: ("publicUniversity" | "privateUniversity" | "communityCollege" | "militaryAcademy" | "religiousAffiliated")[];
+  institutionTypeMissions: ("liberalArts" | "research" | "teaching" | "professionalTraining" | "onlineEducation" | "specialized" | "graduateEducation" | "militaryTraining")[];
+  termSystems: ("semester" | "quarter")[];
+  writingProgramStructures: ("independentWritingProgram" | "embeddedInLiteratureDept" | "embeddedInOtherDept")[];
+  writingProgramAdmins: ("oneFormalWpa" | "multipleDirectors" | "noFormalAdministrator")[];
+
+  // Course Offerings filters
+  hasDevRemWriting: boolean | null;
+  hasFycRequired: boolean | null;
+  hasStretchFyc: boolean | null;
+  hasUpperDivWriting: boolean | null;
+  hasEslUndergradWriting: boolean | null;
+  hasEslGradWriting: boolean | null;
+
+  // Minority-Serving Institution filters
+  showOnlyHbcu: boolean;
+  showOnlyHsi: boolean;
+  showOnlyAanapisi: boolean;
+  showOnlyTribal: boolean;
+  showOnlyMsi: boolean;
 }
 
 /**
