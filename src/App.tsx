@@ -5,7 +5,7 @@ import MapView from './components/MapView';
 import ChartsView from './components/ChartsView';
 import ComparisonView from './components/ComparisonView';
 import ChatTab from './components/ChatTab';
-import { institutions, getCarnegieClassifications, simplifyCarnegieClassification } from './data/institutions';
+import { institutions, getCarnegieClassifications } from './data/institutions';
 import { filterInstitutions, createDefaultFilterState, sortInstitutions } from './utils/filters';
 import { ViewMode, FilterState, SortConfig, Institution } from './types';
 
@@ -208,7 +208,7 @@ function App() {
                         }}
                         className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                       />
-                      <span className="ml-2 text-sm text-slate-700">{simplifyCarnegieClassification(classification)}</span>
+                      <span className="ml-2 text-sm text-slate-700">{classification}</span>
                     </label>
                   ))}
                 </div>
