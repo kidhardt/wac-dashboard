@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { Institution } from '../types';
 import { Filter, X, Download } from 'lucide-react';
+import { simplifyCarnegieClassification } from '../data/institutions';
 
 interface ChartsViewProps {
   institutions: Institution[];
@@ -266,13 +267,9 @@ const ChartsView = ({ institutions }: ChartsViewProps) => {
     .filter(inst => inst.carnegieClassification) // Filter out institutions without Carnegie classification
     .reduce((acc, inst) => {
       const classification = inst.carnegieClassification;
-      // Simplify Carnegie classifications for display - very short labels
-      const shortName = classification.includes('R1') ? 'R1' :
-                        classification.includes('R2') ? 'R2' :
-                        classification.includes('Baccalaureate') ? 'Baccalaureate' :
-                        classification.includes('Associate') ? "Associate's" :
-                        classification;
-      const existing = acc.find(item => item.id === classification);
+      // Use simplified Carnegie classification labels
+      const shortName = simplifyCarnegieClassification(classification);
+      const existing = acc.find(item => item.name === shortName);
       if (existing) {
         existing.count += 1;
       } else {
@@ -617,17 +614,20 @@ const ChartsView = ({ institutions }: ChartsViewProps) => {
             role="img"
             aria-label={`Bar chart showing distribution of Carnegie classifications. ${carnegieData.map((d: any) => `${d.name}: ${d.percentage}%`).join(', ')}`}
           >
-            <ResponsiveContainer width="100%" height={250} className="text-xs sm:text-sm">
+            <ResponsiveContainer width="100%" height={300} className="text-xs sm:text-sm">
               <BarChart
                 data={carnegieData}
-                margin={{ top: 20, right: 10, left: 10, bottom: 5 }}
+                margin={{ top: 20, right: 10, left: 10, bottom: 60 }}
                 aria-hidden="true"
               >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="name"
-                  tick={{ fontSize: 11 }}
+                  tick={{ fontSize: 10 }}
                   interval={0}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
                 />
                 <YAxis
                   domain={[0, 100]}

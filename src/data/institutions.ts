@@ -30,16 +30,19 @@ export const getInstitutionTypes = (): ('public' | 'private' | 'community')[] =>
 };
 
 /**
- * Helper function to simplify Carnegie classification labels
+ * Helper function to simplify Carnegie classification labels for dashboard display
  */
 export const simplifyCarnegieClassification = (classification: string): string => {
-  if (classification.includes('R1')) return 'R1: Doctoral Universities';
-  if (classification.includes('R2')) return 'R2: Doctoral Universities';
-  if (classification.includes('Baccalaureate')) return 'Baccalaureate Colleges';
-  if (classification.includes('Associate')) return "Associate's Colleges";
-  if (classification.includes('Master')) return "Master's Colleges & Universities";
-  if (classification.includes('Special Focus')) return 'Special Focus Institutions';
-  if (classification.includes('Doctoral Universities: High Research Activity')) return 'Doctoral Universities: High Research';
+  if (classification.includes('R1')) return 'R1 Doctoral';
+  if (classification.includes('R2')) return 'R2 Doctoral';
+  if (classification.includes('Baccalaureate')) return 'Baccalaureate';
+  if (classification.includes("Master's") && classification.includes('Larger')) return 'Masters Larger';
+  if (classification.includes("Master's") && classification.includes('Medium')) return 'Masters Medium';
+  if (classification.includes("Associate's") && classification.includes('Mixed')) return 'Associates Mixed';
+  if (classification.includes("Associate's") && classification.includes('Traditional')) return 'Associates Traditional';
+  if (classification.includes('Special Focus')) return 'Special Focus';
+  // Fallback for "Doctoral Universities: High Research Activity" (no R1/R2 prefix)
+  if (classification.includes('Doctoral') && classification.includes('High Research')) return 'R2 Doctoral';
   return classification;
 };
 
