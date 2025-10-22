@@ -1,8 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send } from 'lucide-react';
+import { Send, AlertTriangle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { institutions } from '../data/institutions';
-import programDescriptions from '../data/program-descriptions.json';
+import { getGroundTruthStats } from '../utils';
+import {
+  NOTEBOOK_LM_CONFIG,
+  isNotebookLMDisabled,
+  isUserControlled,
+  isAutoRoute,
+} from '../config/notebookLM';
+import { buildSystemPrompt, buildAutoRoutePrompt } from '../utils/notebookPrompts';
 
 /**
  * Message interface for chat history
@@ -12,6 +18,8 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  validationWarning?: string; // Added for showing validation corrections
+  sources?: Array<'institution-data' | 'notebooks'>; // Track which sources were used
 }
 
 /**
@@ -23,34 +31,11 @@ const ChatTab = () => {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [includeNotebooks, setIncludeNotebooks] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Create system prompt with institution data
-  const systemPrompt = `You are a helpful WAC Dashboard assistant. You help users explore and analyze Writing Across the Curriculum (WAC) programs at different institutions.
-
-You have access to data for 12 institutions:
-${institutions.map(inst => `
-- ${inst.name} (${inst.shortName})
-  * Location: ${inst.city}, ${inst.state}
-  * Type: ${inst.institutionType}
-  * Carnegie Classification: ${inst.carnegieClassification}
-  * Total Enrollment: ${inst.totalEnrollment.toLocaleString()}
-  * WAC Program Established: ${inst.wacProgramEstablished}
-  * WAC Budget: $${inst.wacBudget?.toLocaleString() || 'N/A'}
-  * Writing Intensive Courses: ${inst.writingIntensiveCourses}
-  * Required WI Courses: ${inst.requiredWICourses}
-  * Writing Center Staff: ${inst.writingCenterStaff}
-  * Writing Tutors Available: ${inst.writingTutorsAvailable}
-  * Faculty Workshops Per Year: ${inst.facultyWorkshopsPerYear}
-`).join('\n')}
-
-DETAILED PROGRAM DESCRIPTIONS:
-${programDescriptions.institutions.map(desc => `
-${desc.id.toUpperCase()}:
-${desc.programDescription}
-`).join('\n')}
-
-Answer questions accurately based on this data. If asked about an institution not in the dataset, politely explain that you only have data for these 12 institutions. Be specific and cite numbers when available.`;
+  // Get ground truth stats for validation
+  const groundTruthStats = getGroundTruthStats();
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -76,7 +61,6 @@ Answer questions accurately based on this data. If asked about an institution no
 
     try {
       // Prepare messages for API (convert to Claude API format)
-      // Filter to ensure messages alternate user/assistant and don't start with assistant
       const allMessages = [...messages, userMessage];
       const apiMessages = allMessages
         .filter(msg => msg.role === 'user' || msg.role === 'assistant')
@@ -85,10 +69,43 @@ Answer questions accurately based on this data. If asked about an institution no
           content: msg.content,
         }));
 
+      // Build system prompt based on mode
+      let systemPrompt: string;
+      let maxTokens: number;
+
+      if (isNotebookLMDisabled()) {
+        // Mode 1: Disabled - never use NotebookLM
+        systemPrompt = buildSystemPrompt(false);
+        maxTokens = NOTEBOOK_LM_CONFIG.maxTokensWithoutNotebooks;
+
+      } else if (isUserControlled()) {
+        // Mode 2: User-controlled - use checkbox state
+        systemPrompt = buildSystemPrompt(includeNotebooks);
+        maxTokens = includeNotebooks
+          ? NOTEBOOK_LM_CONFIG.maxTokensWithNotebooks
+          : NOTEBOOK_LM_CONFIG.maxTokensWithoutNotebooks;
+
+      } else if (isAutoRoute()) {
+        // Mode 3: Auto-route - Claude decides
+        systemPrompt = buildAutoRoutePrompt();
+        maxTokens = NOTEBOOK_LM_CONFIG.maxTokensWithNotebooks;
+      } else {
+        // Fallback to disabled mode
+        systemPrompt = buildSystemPrompt(false);
+        maxTokens = NOTEBOOK_LM_CONFIG.maxTokensWithoutNotebooks;
+      }
+
+      console.log('Chat mode:', NOTEBOOK_LM_CONFIG.mode);
+      console.log('Using NotebookLM:',
+        isNotebookLMDisabled() ? 'No (disabled)' :
+        isUserControlled() ? (includeNotebooks ? 'Yes (user checked)' : 'No (user unchecked)') :
+        'Maybe (auto-route)'
+      );
+
       // Call Claude API through our backend proxy
       const requestBody = {
-        model: 'claude-haiku-4-5',
-        max_tokens: 1000,
+        model: 'claude-sonnet-4-5',
+        max_tokens: maxTokens,
         system: systemPrompt,
         messages: apiMessages,
       };
@@ -96,7 +113,8 @@ Answer questions accurately based on this data. If asked about an institution no
       console.log('Sending request to proxy server:', {
         messageCount: apiMessages.length,
         systemPromptLength: systemPrompt.length,
-        firstMessage: apiMessages[0],
+        maxTokens: maxTokens,
+        mode: NOTEBOOK_LM_CONFIG.mode,
       });
 
       const response = await fetch('http://localhost:3004/api/chat', {
@@ -121,11 +139,76 @@ Answer questions accurately based on this data. If asked about an institution no
       // Extract assistant response
       const assistantContent = data.content?.[0]?.text || 'Sorry, I could not generate a response.';
 
+      // Detect which sources were used in the response
+      const sources: Array<'institution-data' | 'notebooks'> = ['institution-data']; // Always includes data
+
+      if (!isNotebookLMDisabled()) {
+        // Check if NotebookLM was consulted based on response content
+        const notebookIndicators = [
+          'notebooklm',
+          'source 2',
+          'research from your',
+          'according to research',
+          'notebook',
+        ];
+
+        const lowerContent = assistantContent.toLowerCase();
+        const hasNotebookReference = notebookIndicators.some(indicator =>
+          lowerContent.includes(indicator)
+        );
+
+        if (hasNotebookReference) {
+          sources.push('notebooks');
+        }
+      }
+
+      // Validation logic (runs silently in background for debugging)
+      // To re-enable validation warnings, set ENABLE_VALIDATION_WARNINGS = true
+      const ENABLE_VALIDATION_WARNINGS = false;
+      let validationWarning: string | undefined;
+
+      if (ENABLE_VALIDATION_WARNINGS) {
+        // Pattern to detect count claims (e.g., "9 R1 institutions", "8 institutions", etc.)
+        const countPattern = /(\d+)\s+(?:R1\s+)?institutions?/gi;
+        const matches = [...assistantContent.matchAll(countPattern)];
+
+        if (matches.length > 0) {
+          // Check if response contains a numbered list
+          const listPattern = /^\d+\.\s+/gm;
+          const listItems = assistantContent.match(listPattern);
+          const listCount = listItems ? listItems.length : 0;
+
+          // Check claimed vs actual list count
+          for (const match of matches) {
+            const claimedCount = parseInt(match[1]);
+            if (listCount > 0 && claimedCount !== listCount) {
+              validationWarning = `⚠️ Validation Warning: Response claimed ${claimedCount} institutions but listed ${listCount}. The actual count is ${listCount}.`;
+              console.warn('[VALIDATION]', validationWarning);
+              break;
+            }
+          }
+
+          // Verify against ground truth for R1 institutions
+          if (assistantContent.toLowerCase().includes('r1')) {
+            for (const match of matches) {
+              const claimedCount = parseInt(match[1]);
+              if (match[0].toLowerCase().includes('r1') && claimedCount !== groundTruthStats.r1Institutions.total) {
+                validationWarning = `⚠️ Validation Warning: Response claimed ${claimedCount} R1 institutions. The correct count is ${groundTruthStats.r1Institutions.total} R1 institutions.`;
+                console.warn('[VALIDATION]', validationWarning);
+                break;
+              }
+            }
+          }
+        }
+      }
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: assistantContent,
         timestamp: new Date(),
+        validationWarning,
+        sources: NOTEBOOK_LM_CONFIG.enableSourceBadges ? sources : undefined,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -211,9 +294,47 @@ Answer questions accurately based on this data. If asked about an institution no
                 </span>
               </div>
               {message.role === 'assistant' ? (
-                <div className="text-sm prose prose-sm max-w-none prose-headings:text-slate-900 prose-p:text-slate-700 prose-strong:text-slate-900 prose-ul:text-slate-700 prose-li:text-slate-700">
-                  <ReactMarkdown>{message.content}</ReactMarkdown>
-                </div>
+                <>
+                  {message.validationWarning && (
+                    <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-yellow-800">{message.validationWarning}</p>
+                    </div>
+                  )}
+                  <div className="text-sm prose prose-sm max-w-none prose-headings:text-slate-900 prose-p:text-slate-700 prose-strong:text-slate-900 prose-ul:text-slate-700 prose-li:text-slate-700">
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  </div>
+                  {message.sources && message.sources.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                      {message.sources.map(source => (
+                        <span
+                          key={source}
+                          className={`px-2 py-1 rounded flex items-center gap-1 ${
+                            source === 'institution-data'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-blue-100 text-blue-700'
+                          }`}
+                        >
+                          {source === 'institution-data' ? (
+                            <>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                              </svg>
+                              Institution Data
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                              </svg>
+                              Notebooks
+                            </>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </>
               ) : (
                 <p className="text-sm whitespace-pre-wrap break-words">
                   {message.content}
@@ -231,10 +352,17 @@ Answer questions accurately based on this data. If asked about an institution no
               <div className="flex items-baseline gap-2 mb-1">
                 <span className="text-xs font-semibold text-slate-900">Assistant:</span>
               </div>
-              <div className="flex gap-1">
-                <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                </div>
+                {((isUserControlled() && includeNotebooks) || isAutoRoute()) && (
+                  <span className="text-xs text-blue-600 ml-2">
+                    May be consulting notebooks...
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -259,6 +387,33 @@ Answer questions accurately based on this data. If asked about an institution no
 
       {/* Input Area */}
       <div className="bg-white border-t border-slate-200 px-6 py-4">
+        {/* Notebooks Toggle - only shown in user-controlled mode */}
+        {isUserControlled() && (
+          <div className="mb-3">
+            <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer hover:text-slate-800 transition-colors">
+              <input
+                type="checkbox"
+                checked={includeNotebooks}
+                onChange={(e) => setIncludeNotebooks(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-2 focus:ring-blue-500"
+                aria-label="Include notebooks from NotebookLM"
+              />
+              <span className="flex items-center gap-1.5">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                Include Notebooks
+              </span>
+            </label>
+
+            {includeNotebooks && (
+              <p className="text-xs text-blue-600 mt-1 ml-6">
+                Response will include insights from your NotebookLM library
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="flex gap-3">
           <input
             type="text"

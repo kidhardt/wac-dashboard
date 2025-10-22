@@ -499,29 +499,67 @@ export const getEstablishedYearRange = (): { min: number; max: number } => {
 };
 
 /**
- * Calculate statistics across all institutions
+ * Calculate statistics across all institutions with validation metadata
+ *
+ * Enhanced version that includes a _metadata field with validation checks
+ * to ensure data integrity and provide ground truth statistics for LLM validation.
+ *
+ * The _metadata field includes:
+ * - calculatedAt: Timestamp of when statistics were calculated
+ * - dataIntegrity: Validation checks on the data
+ * - groundTruthCounts: Definitive counts for LLM validation
  */
 export const calculateStatistics = (institutionList: Institution[] = institutions) => {
   const total = institutionList.length;
   const withWAC = institutionList.filter(i => i.hasWACProgram).length;
   const withWritingCenter = institutionList.filter(i => i.hasWritingCenter).length;
-  
+
   const avgEnrollment = Math.round(
     institutionList.reduce((sum, i) => sum + i.totalEnrollment, 0) / total
   );
-  
+
   const budgets = institutionList
     .map(i => i.wacBudget)
     .filter((b): b is number => b !== null);
-  const avgBudget = budgets.length > 0 
+  const avgBudget = budgets.length > 0
     ? Math.round(budgets.reduce((sum, b) => sum + b, 0) / budgets.length)
     : 0;
-  
+
   const totalWICourses = institutionList.reduce(
-    (sum, i) => sum + i.writingIntensiveCourses, 
+    (sum, i) => sum + i.writingIntensiveCourses,
     0
   );
-  
+
+  // Carnegie classification breakdown for ground truth
+  const carnegieStats = institutionList.reduce((acc, i) => {
+    acc[i.carnegieClassification] = (acc[i.carnegieClassification] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Institution type breakdown for ground truth
+  const typeStats = institutionList.reduce((acc, i) => {
+    acc[i.institutionType] = (acc[i.institutionType] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // State breakdown for ground truth
+  const stateStats = institutionList.reduce((acc, i) => {
+    acc[i.state] = (acc[i.state] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // R1 institutions for detailed tracking
+  const r1Institutions = institutionList.filter(
+    i => i.carnegieClassification === 'R1: Doctoral Universities – Very High Research Activity'
+  );
+
+  // Data integrity checks
+  const hasAllWACPrograms = institutionList.every(i => typeof i.hasWACProgram === 'boolean');
+  const hasAllWritingCenters = institutionList.every(i => typeof i.hasWritingCenter === 'boolean');
+  const hasValidCoordinates = institutionList.every(
+    i => typeof i.coordinates?.lat === 'number' && typeof i.coordinates?.lng === 'number'
+  );
+
   return {
     totalInstitutions: total,
     withWACPrograms: withWAC,
@@ -529,17 +567,29 @@ export const calculateStatistics = (institutionList: Institution[] = institution
     averageEnrollment: avgEnrollment,
     averageWACBudget: avgBudget,
     totalWritingIntensiveCourses: totalWICourses,
-    institutionsByType: institutionList.reduce((acc, i) => {
-      acc[i.institutionType] = (acc[i.institutionType] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>),
-    institutionsByState: institutionList.reduce((acc, i) => {
-      acc[i.state] = (acc[i.state] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>),
-    carnegieClassificationStats: institutionList.reduce((acc, i) => {
-      acc[i.carnegieClassification] = (acc[i.carnegieClassification] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>),
+    institutionsByType: typeStats,
+    institutionsByState: stateStats,
+    carnegieClassificationStats: carnegieStats,
+
+    // Validation metadata for LLM integration and data integrity
+    _metadata: {
+      calculatedAt: new Date().toISOString(),
+      dataIntegrity: {
+        allHaveWACProgramFlag: hasAllWACPrograms,
+        allHaveWritingCenterFlag: hasAllWritingCenters,
+        allHaveValidCoordinates: hasValidCoordinates,
+        totalRecordsProcessed: total,
+      },
+      groundTruthCounts: {
+        totalInstitutions: total,
+        wacPrograms: withWAC,
+        writingCenters: withWritingCenter,
+        r1Institutions: r1Institutions.length,
+        r1InstitutionNames: r1Institutions.map(i => i.shortName).sort(),
+        carnegieClassifications: Object.keys(carnegieStats).length,
+        institutionTypes: Object.keys(typeStats).length,
+        statesRepresented: Object.keys(stateStats).length,
+      },
+    },
   };
 };

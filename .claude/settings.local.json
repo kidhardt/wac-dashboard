@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(npm install)",
+      "Bash(npx tsc:*)",
+      "Bash(npx tsx:*)",
+      "Bash(if [ -f .env ])",
+      "Bash(then echo \".env file exists\")",
+      "Bash(else echo \".env file does NOT exist\")",
+      "Bash(fi)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3004)",
+      "Bash(node:*)",
+      "Bash(bd:*)",
+      "Bash(go install:*)",
+      "Read(//c/Users/geove/.claude/**)",
+      "Bash(git clone:*)",
+      "Bash(cat:*)",
+      "Bash(python scripts/run.py:*)",
+      "Bash(powershell -Command \"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; python scripts/run.py auth_manager.py status\")",
+      "Bash(PYTHONIOENCODING=utf-8 python:*)",
+      "Bash(npm run dev:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

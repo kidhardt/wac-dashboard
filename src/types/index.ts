@@ -145,3 +145,40 @@ export interface MapMarker {
   position: [number, number];
   isSelected: boolean;
 }
+
+/**
+ * Validation metadata for data integrity checks
+ *
+ * Purpose: Provides validation information about the dataset and calculated statistics.
+ * Used by the enhanced calculateStatistics function to track data quality and
+ * provide ground truth for LLM validation.
+ */
+export interface ValidationMetadata {
+  calculatedAt: string;
+  dataIntegrity: {
+    allHaveWACProgramFlag: boolean;
+    allHaveWritingCenterFlag: boolean;
+    allHaveValidCoordinates: boolean;
+    totalRecordsProcessed: number;
+  };
+  groundTruthCounts: {
+    totalInstitutions: number;
+    wacPrograms: number;
+    writingCenters: number;
+    r1Institutions: number;
+    r1InstitutionNames: string[];
+    carnegieClassifications: number;
+    institutionTypes: number;
+    statesRepresented: number;
+  };
+}
+
+/**
+ * Enhanced InstitutionStatistics with validation metadata
+ *
+ * Extends the base statistics interface to include validation metadata
+ * for use with LLM validation utilities.
+ */
+export interface InstitutionStatisticsWithMetadata extends InstitutionStatistics {
+  _metadata: ValidationMetadata;
+}

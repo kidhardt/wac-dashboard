@@ -25,9 +25,9 @@ const Header = ({ totalInstitutions, filteredCount }: HeaderProps) => {
               <BookOpen className="w-7 h-7" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold">WAC Dashboard</h1>
+              <h1 className="text-3xl font-bold">WAC Explorer</h1>
               <p className="text-primary-100 mt-1">
-                Writing Across the Curriculum Explorer
+                Writing Across the Curriculum
               </p>
             </div>
           </div>
