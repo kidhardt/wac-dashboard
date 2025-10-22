@@ -48,6 +48,7 @@ export const simplifyCarnegieClassification = (classification: string): string =
 
 /**
  * Helper function to get unique Carnegie classifications in preferred order
+ * Returns the FULL classification strings (not simplified) for filtering purposes
  */
 export const getCarnegieClassifications = (): string[] => {
   const uniqueClassifications = Array.from(new Set(institutions.map(inst => inst.carnegieClassification)));
@@ -77,6 +78,38 @@ export const getCarnegieClassifications = (): string[] => {
     // If only B is in the order array, it comes first
     if (indexB !== -1) return 1;
     // Otherwise, alphabetically sort
+    return a.localeCompare(b);
+  });
+};
+
+/**
+ * Helper function to get unique SIMPLIFIED Carnegie classifications for display
+ * Groups similar classifications and returns display labels
+ */
+export const getSimplifiedCarnegieClassifications = (): string[] => {
+  // Get all unique simplified labels
+  const simplifiedLabels = Array.from(
+    new Set(institutions.map(inst => simplifyCarnegieClassification(inst.carnegieClassification)))
+  );
+
+  // Define preferred display order for simplified labels
+  const order = [
+    'R1 Doctoral',
+    'R2 Doctoral',
+    'Baccalaureate',
+    'Masters Larger',
+    'Masters Medium',
+    'Associates Traditional',
+    'Associates Mixed',
+    'Special Focus'
+  ];
+
+  return simplifiedLabels.sort((a, b) => {
+    const indexA = order.indexOf(a);
+    const indexB = order.indexOf(b);
+    if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+    if (indexA !== -1) return -1;
+    if (indexB !== -1) return 1;
     return a.localeCompare(b);
   });
 };

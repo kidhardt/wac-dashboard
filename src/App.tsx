@@ -5,7 +5,7 @@ import MapView from './components/MapView';
 import ChartsView from './components/ChartsView';
 import ComparisonView from './components/ComparisonView';
 import ChatTab from './components/ChatTab';
-import { institutions, getCarnegieClassifications, simplifyCarnegieClassification } from './data/institutions';
+import { institutions, getSimplifiedCarnegieClassifications, simplifyCarnegieClassification } from './data/institutions';
 import { filterInstitutions, createDefaultFilterState, sortInstitutions } from './utils/filters';
 import { ViewMode, FilterState, SortConfig, Institution } from './types';
 
@@ -195,22 +195,36 @@ function App() {
                   Carnegie Classification
                 </label>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {getCarnegieClassifications().map(classification => (
-                    <label key={classification} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={filters.carnegieClassifications.includes(classification)}
-                        onChange={(e) => {
-                          const classifications = e.target.checked
-                            ? [...filters.carnegieClassifications, classification]
-                            : filters.carnegieClassifications.filter(c => c !== classification);
-                          handleFilterChange({ carnegieClassifications: classifications });
-                        }}
-                        className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-                      />
-                      <span className="ml-2 text-sm text-slate-700">{simplifyCarnegieClassification(classification)}</span>
-                    </label>
-                  ))}
+                  {getSimplifiedCarnegieClassifications().map(simplifiedLabel => {
+                    // Find all full classifications that map to this simplified label
+                    const matchingFullClassifications = institutions
+                      .map(inst => inst.carnegieClassification)
+                      .filter(fullClass => simplifyCarnegieClassification(fullClass) === simplifiedLabel);
+
+                    // Check if ANY of the matching classifications are in the filter
+                    const isChecked = matchingFullClassifications.some(fullClass =>
+                      filters.carnegieClassifications.includes(fullClass)
+                    );
+
+                    return (
+                      <label key={simplifiedLabel} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            // When checking: add ALL matching full classifications
+                            // When unchecking: remove ALL matching full classifications
+                            const updatedClassifications = e.target.checked
+                              ? [...new Set([...filters.carnegieClassifications, ...matchingFullClassifications])]
+                              : filters.carnegieClassifications.filter(c => !matchingFullClassifications.includes(c));
+                            handleFilterChange({ carnegieClassifications: updatedClassifications });
+                          }}
+                          className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span className="ml-2 text-sm text-slate-700">{simplifiedLabel}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
