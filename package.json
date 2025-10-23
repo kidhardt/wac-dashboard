@@ -3,10 +3,11 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "homepage": "/",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --mode development",
     "server": "node server.js",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build --mode production",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
@@ -30,6 +31,7 @@
     "@types/react-dom": "^18.2.17",
     "@typescript-eslint/eslint-plugin": "^6.14.0",
     "@typescript-eslint/parser": "^6.14.0",
+    "@vercel/node": "^5.4.1",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
     "eslint": "^8.55.0",
