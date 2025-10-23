@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, AlertTriangle, MessageSquare, Download } from 'lucide-react';
+import { Send, AlertTriangle, MessageSquare, Download, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { getGroundTruthStats } from '../utils';
 import {
@@ -490,30 +490,30 @@ const ChatTab = () => {
 
         <div ref={messagesEndRef} />
 
-        {/* Clear Chat and Download Chat Buttons - aligned left with message padding */}
-        {messages.length > 0 && (
+        {/* Clear Chat and Download Chat Buttons - only shown after first assistant response */}
+        {messages.some(m => m.role === 'assistant') && (
           <div className="pt-4 pb-2 flex items-center gap-3">
+            {/* Clear Chat Button - styled as subtle red badge */}
             <button
               onClick={handleClearChat}
               disabled={isClearing || isTyping}
-              className="text-xs text-slate-400 hover:text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-medium"
               aria-label="Clear chat history"
             >
+              <X className="w-3.5 h-3.5 group-hover:rotate-90 transition-transform" />
               Clear Chat
             </button>
 
-            {/* Download Chat Button - only shown after first assistant response */}
-            {messages.some(m => m.role === 'assistant') && (
-              <button
-                onClick={handleDownloadChat}
-                disabled={isTyping}
-                className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-green-100 text-green-700 hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-medium"
-                aria-label="Download chat transcript"
-              >
-                <Download className="w-3.5 h-3.5 group-hover:translate-y-0.5 transition-transform" />
-                Download Chat
-              </button>
-            )}
+            {/* Download Chat Button - styled as subtle green badge */}
+            <button
+              onClick={handleDownloadChat}
+              disabled={isTyping}
+              className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-green-100 text-green-700 hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+              aria-label="Download chat transcript"
+            >
+              <Download className="w-3.5 h-3.5 group-hover:translate-y-0.5 transition-transform" />
+              Download Chat
+            </button>
           </div>
         )}
       </div>
