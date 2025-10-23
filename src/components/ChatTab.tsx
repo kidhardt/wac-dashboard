@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, AlertTriangle } from 'lucide-react';
+import { Send, AlertTriangle, MessageSquare, Download } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { getGroundTruthStats } from '../utils';
 import {
@@ -9,6 +9,8 @@ import {
   isAutoRoute,
 } from '../config/notebookLM';
 import { buildSystemPrompt, buildAutoRoutePrompt } from '../utils/notebookPrompts';
+import { callClaudeApi, getApiConfig, validateApiConfig } from '../config/api';
+import { isChatEnabled } from '../config/features';
 
 /**
  * Message interface for chat history
@@ -33,14 +35,19 @@ const ChatTab = () => {
   const [isClearing, setIsClearing] = useState(false);
   const [includeNotebooks, setIncludeNotebooks] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageHistoryRef = useRef<HTMLDivElement>(null);
 
   // Get ground truth stats for validation
   const groundTruthStats = getGroundTruthStats();
 
-  // Auto-scroll to bottom when new messages arrive
+  // Validate API configuration on mount
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    try {
+      validateApiConfig();
+    } catch (error) {
+      console.error('[Chat] API configuration error:', error);
+    }
+  }, []);
 
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
@@ -95,14 +102,17 @@ const ChatTab = () => {
         maxTokens = NOTEBOOK_LM_CONFIG.maxTokensWithoutNotebooks;
       }
 
+      const apiConfig = getApiConfig();
+
       console.log('Chat mode:', NOTEBOOK_LM_CONFIG.mode);
+      console.log('API mode:', apiConfig.mode, '-', apiConfig.description);
       console.log('Using NotebookLM:',
         isNotebookLMDisabled() ? 'No (disabled)' :
         isUserControlled() ? (includeNotebooks ? 'Yes (user checked)' : 'No (user unchecked)') :
         'Maybe (auto-route)'
       );
 
-      // Call Claude API through our backend proxy
+      // Call Claude API (automatically uses correct endpoint based on environment)
       const requestBody = {
         model: 'claude-sonnet-4-5',
         max_tokens: maxTokens,
@@ -110,20 +120,15 @@ const ChatTab = () => {
         messages: apiMessages,
       };
 
-      console.log('Sending request to proxy server:', {
+      console.log('Sending request via', apiConfig.mode, 'mode:', {
+        endpoint: apiConfig.endpoint,
         messageCount: apiMessages.length,
         systemPromptLength: systemPrompt.length,
         maxTokens: maxTokens,
         mode: NOTEBOOK_LM_CONFIG.mode,
       });
 
-      const response = await fetch('http://localhost:3004/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
+      const response = await callClaudeApi(requestBody);
 
       console.log('API Response status:', response.status);
 
@@ -215,12 +220,49 @@ const ChatTab = () => {
     } catch (error) {
       console.error('Error calling Claude API:', error);
 
-      // Add error message to chat with details
-      const errorDetails = error instanceof Error ? error.message : String(error);
+      // Enhanced error handling with detailed diagnostics
+      const apiConfig = getApiConfig();
+      const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+
+      let errorContent = '## ❌ Chat Error\n\n';
+
+      // Determine error type and provide specific guidance
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        errorContent += '**Network Error**: Unable to connect to the API.\n\n';
+        errorContent += '**Possible causes**:\n';
+
+        if (apiConfig.mode === 'direct') {
+          errorContent += '1. **CORS Issue**: Anthropic API may block direct browser requests\n';
+          errorContent += '2. **API Key Invalid**: Check your API key at https://console.anthropic.com/\n';
+          errorContent += '3. **Network Problem**: Check your internet connection\n';
+          errorContent += '4. **Firewall/Security**: Your network may be blocking the request\n\n';
+          errorContent += '**Current Configuration**:\n';
+          errorContent += `- Mode: Direct API (${apiConfig.endpoint})\n`;
+          errorContent += `- API Key: ${apiKey ? '✓ Present (starts with ' + apiKey.substring(0, 15) + '...)' : '✗ Missing'}\n\n`;
+          errorContent += '**Solution**: Try using a proxy server instead of direct API calls.\n';
+          errorContent += 'Contact your developer to enable proxy mode for production.';
+        } else {
+          errorContent += '1. **Proxy server not running**: Start with `npm run server`\n';
+          errorContent += `2. **Wrong endpoint**: Trying to reach ${apiConfig.endpoint}\n`;
+          errorContent += '3. **Network blocked**: Firewall may be blocking localhost:3004\n\n';
+          errorContent += '**Solution**: Make sure the proxy server is running in development mode.';
+        }
+      } else if (error instanceof Error) {
+        errorContent += `**Error**: ${error.message}\n\n`;
+        errorContent += '**Configuration**:\n';
+        errorContent += `- API Mode: ${apiConfig.mode}\n`;
+        errorContent += `- Endpoint: ${apiConfig.endpoint}\n`;
+        errorContent += `- API Key: ${apiKey ? '✓ Present' : '✗ Missing'}\n\n`;
+        errorContent += '**Stack Trace**:\n```\n' + (error.stack || 'No stack trace available') + '\n```';
+      } else {
+        errorContent += `**Unknown error**: ${String(error)}\n\n`;
+        errorContent += 'Please check the browser console (F12) for more details.';
+      }
+
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `Sorry, I encountered an error while processing your request:\n\n${errorDetails}\n\nPlease check the browser console for more details.`,
+        content: errorContent,
         timestamp: new Date(),
       };
 
@@ -238,7 +280,12 @@ const ChatTab = () => {
   };
 
   const handleClearChat = () => {
+    // Scroll to top FIRST, before any state changes
+    window.scrollTo({ top: 0, behavior: 'instant' });
+
+    // Then set clearing state for fade animation
     setIsClearing(true);
+
     // Wait for fade animation to complete before clearing
     setTimeout(() => {
       setMessages([]);
@@ -246,6 +293,79 @@ const ChatTab = () => {
     }, 300); // Match the transition duration
   };
 
+  const handleDownloadChat = () => {
+    // Format chat transcript
+    const timestamp = new Date().toLocaleString();
+    let transcript = `WAC Dashboard Chat Transcript\n`;
+    transcript += `Downloaded: ${timestamp}\n`;
+    transcript += `${'='.repeat(60)}\n\n`;
+
+    messages.forEach((message) => {
+      const role = message.role === 'user' ? 'You' : 'Assistant';
+      const time = message.timestamp.toLocaleString();
+      transcript += `[${role}] (${time})\n`;
+
+      if (message.validationWarning) {
+        transcript += `${message.validationWarning}\n\n`;
+      }
+
+      transcript += `${message.content}\n`;
+
+      if (message.sources && message.sources.length > 0) {
+        transcript += `\nSources: ${message.sources.join(', ')}\n`;
+      }
+
+      transcript += `\n${'-'.repeat(60)}\n\n`;
+    });
+
+    // Create blob and download
+    const blob = new Blob([transcript], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const filename = `wac-chat-transcript-${new Date().toISOString().split('T')[0]}.txt`;
+
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link); // Required for Firefox
+    link.click();
+
+    // Cleanup
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Check if chat is enabled via feature flag
+  const chatEnabled = isChatEnabled();
+
+  // Render "Coming Soon" message if chat is disabled
+  if (!chatEnabled) {
+    return (
+      <div className="flex flex-col h-full" role="region" aria-label="Chat Interface">
+        {/* Header */}
+        <div className="bg-white border-b border-slate-200 px-6 py-4">
+          <h2 className="text-xl font-semibold text-slate-900">Chat</h2>
+        </div>
+
+        {/* Coming Soon Message */}
+        <div className="flex-1 flex items-center justify-center bg-slate-50 px-6 py-12">
+          <div className="text-center max-w-md">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+              <MessageSquare className="w-8 h-8 text-blue-600" />
+            </div>
+            <h3 className="text-2xl font-semibold text-slate-900 mb-2">
+              Chat Coming Soon!
+            </h3>
+            <p className="text-slate-600 leading-relaxed">
+              We're working on bringing you an interactive chat experience to explore WAC institution data.
+              Check back soon!
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render full chat interface if chat is enabled
   return (
     <div className="flex flex-col h-full" role="region" aria-label="Chat Interface">
       {/* Header */}
@@ -254,7 +374,7 @@ const ChatTab = () => {
       </div>
 
       {/* Message History Area */}
-      <div className="flex-1 overflow-y-auto bg-slate-50 px-6 py-4 space-y-4">
+      <div ref={messageHistoryRef} className="flex-1 overflow-y-auto bg-slate-50 px-6 py-4 space-y-4">
         {/* Welcome message - only shown when no messages */}
         {messages.length === 0 && !isClearing && (
           <div className="flex justify-start">
@@ -370,9 +490,9 @@ const ChatTab = () => {
 
         <div ref={messagesEndRef} />
 
-        {/* Clear Chat Button - aligned left with message padding */}
+        {/* Clear Chat and Download Chat Buttons - aligned left with message padding */}
         {messages.length > 0 && (
-          <div className="pt-4 pb-2">
+          <div className="pt-4 pb-2 flex items-center gap-3">
             <button
               onClick={handleClearChat}
               disabled={isClearing || isTyping}
@@ -381,6 +501,19 @@ const ChatTab = () => {
             >
               Clear Chat
             </button>
+
+            {/* Download Chat Button - only shown after first assistant response */}
+            {messages.some(m => m.role === 'assistant') && (
+              <button
+                onClick={handleDownloadChat}
+                disabled={isTyping}
+                className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-green-100 text-green-700 hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs font-medium"
+                aria-label="Download chat transcript"
+              >
+                <Download className="w-3.5 h-3.5 group-hover:translate-y-0.5 transition-transform" />
+                Download Chat
+              </button>
+            )}
           </div>
         )}
       </div>
